@@ -1,0 +1,9 @@
+# Python temporary files and folder
+*.py[cod]
+.pytest_cache
+
+# Ignore folder for virtual environment
+venv/
+
+#idea files
+.idea/
