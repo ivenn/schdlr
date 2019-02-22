@@ -2,6 +2,7 @@ import time
 from queue import Queue, Empty
 from threading import Thread, Event
 
+from sсhdlr.task import Task
 from .worker import Worker
 from .log import get_logger
 
@@ -32,15 +33,14 @@ class Scheduler:
         self.state = self.STATE_NOT_STARTED
 
     def __repr__(self):
-        return "Scheduler(queue={queue}, workers={workers}, state={state})".format(
+        return "Scheduler(queue={queue}, state={state})".format(
             queue=self._queue.qsize(),
-            workers=[w.status for w in self.workers],
             state=self.state
         )
 
-    def add_task_set(self, task_set):
+    def add_task_group(self, task_group):
         if self._accept_new_tasks:
-            self.producers.append(task_set)
+            self.producers.append(task_group)
         else:
             log.info("No new tasks!")
 
@@ -73,16 +73,30 @@ class Scheduler:
 
         self.state = self.STATE_RUNNING
 
+    @property
+    def workers_stat(self):
+        return self.workers
+
+    @property
+    def tasks_stat(self):
+        return self._assigned_tasks
+
+    @property
+    def stat(self):
+        return self
+
     def _monitor(self):
         while True:
-            log.info(self)
-            log.info(self._assigned_tasks)
+            log.info(self.stat)
+            log.info(self.tasks_stat)
+            log.info(self.workers_stat)
             time.sleep(1)
 
     def _loop(self):
         while True and not self._terminated:
             try:
                 task = self._queue.get(timeout=1)
+                task.status = Task.SCHEDULED
             except Empty:
                 self._empty_event.set()
                 continue

@@ -17,7 +17,7 @@ tasks = [
     Task('foo_task1', foo, (1,), {'b': 2}),
     Task('foo_task3', foo, (3,), {'b': 2}),
     Task('foo_task4', foo, (10,), {'b': 2}),
-] * 3
+]
 
 s.run()
 print(s)
@@ -26,4 +26,8 @@ for t in tasks:
 time.sleep(10)
 s.stop()
 s.add_task(tt)
+
+
+for t in tasks:
+    print(t.log)
 

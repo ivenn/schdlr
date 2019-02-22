@@ -46,6 +46,7 @@ class Worker:
 
     def stop(self, wait=False):
         log.info('Stopping worker...')
+        self._status = self.STOPPED
         self._inbox.put(WorkerStop)
         if wait:
             self._terminated.wait()
