@@ -17,12 +17,12 @@ class Task:
     IN_PROGRESS = "IN_PROGRESS"
     DONE = "DONE"
 
-    def __init__(self, name, func, args, kwargs, priority=PRIORITY_MID):
+    def __init__(self, name, func, args=None, kwargs=None, priority=PRIORITY_MID):
         self.name = name
         self.priority = priority
         self._func = func
         self._args = args
-        self._kwargs = kwargs
+        self._kwargs = kwargs if kwargs else {}
         self._status = self.PENDING
         self._events = {self.PENDING: time.time()}  # tracking status change
         self._result = _undef_
