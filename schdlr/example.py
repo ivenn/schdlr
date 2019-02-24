@@ -1,7 +1,7 @@
 import time
 
-from sсhdlr.scheduler import Scheduler
-from sсhdlr.task import Task
+from schdlr.scheduler import Scheduler
+from schdlr.task import Task
 
 
 def foo(a, b=1):

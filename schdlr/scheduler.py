@@ -2,7 +2,7 @@ import time
 from queue import Queue, Empty
 from threading import Thread, Event
 
-from sсhdlr.task import Task
+from .task import Task
 from .worker import Worker
 from .log import get_logger
 
@@ -40,7 +40,7 @@ class Scheduler:
 
     def add_task_group(self, task_group):
         if self._accept_new_tasks:
-            self.producers.append(task_group)
+            self.task_producers.append(task_group)
         else:
             log.info("No new tasks!")
 
