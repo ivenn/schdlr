@@ -5,5 +5,11 @@
 # Ignore folder for virtual environment
 venv/
 
-#idea files
+# idea files
 .idea/
+
+# Mac OS files
+.DS_Store
+
+# VS code project files
+.vscode/
