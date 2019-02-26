@@ -8,6 +8,7 @@ class _undef_:
 PRIORITY_LOW = 3
 PRIORITY_MID = 2
 PRIORITY_HI = 1
+DEFAULT_PRIORITY = PRIORITY_MID
 
 
 class Task:
@@ -17,22 +18,35 @@ class Task:
     IN_PROGRESS = "IN_PROGRESS"
     DONE = "DONE"
 
-    def __init__(self, name, func, args, kwargs, priority=PRIORITY_MID):
+    def __init__(self, name, func, args, kwargs):
         self.name = name
-        self.priority = priority
         self._func = func
         self._args = args
         self._kwargs = kwargs
+        self._priority = DEFAULT_PRIORITY
         self._status = self.PENDING
         self._events = {self.PENDING: time.time()}  # tracking status change
         self._result = _undef_
 
     def __repr__(self):
-        return "Task(name={name}, func={func}, args={args}," \
-               " kwargs={kwargs}, status={status})".format(
-                name=self.name, func=self._func.__name__,
-                args=self._args, kwargs=self._kwargs, status=self.status
-            )
+        return "Task(name={name}, func={func}, status={status})".format(
+                name=self.name, func=self._func.__name__, status=self.status
+        )
+
+    def __lt__(self, other):
+        # to be handled correctly by PriorityQueue
+        return self.priority < other.priority
+
+    @property
+    def priority(self):
+        return self._priority
+
+    @priority.setter
+    def priority(self, priority):
+        self._log_event("priority:{old}->{new}".format(
+            old=self.priority, new=priority
+        ))
+        self._priority = int(priority)
 
     def _log_event(self, event):
         self._events[event] = time.time()
