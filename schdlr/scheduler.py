@@ -19,7 +19,7 @@ class Scheduler:
     STATE_STOPPING = "STOPPING"
     STATE_STOPPED = "STOPPED"
 
-    def __init__(self, workers_num):
+    def __init__(self, workers_num, monitor=False):
         self.workers_num = workers_num
         self.workers = []
 
@@ -30,6 +30,7 @@ class Scheduler:
         self._waiting_worker = None
 
         self.main_t = None
+        self.monitor = monitor
         self.monitor_t = None  # TODO: should provide web interface
 
         self.workflows = []
@@ -83,9 +84,9 @@ class Scheduler:
         self.main_t = Thread(target=self._loop, name='schdlr')
         self.main_t.start()
 
-        self.monitor_t = Thread(target=self._monitor, name='monitor')
-        self.monitor_t.daemon = True
-        self.monitor_t.start()
+        if self.monitor:
+            self.monitor_t = Thread(target=self._monitor, name='monitor')
+            self.monitor_t.start()
 
         self.state = self.STATE_RUNNING
 
@@ -126,11 +127,11 @@ class Scheduler:
         return self
 
     def _monitor(self):
-        while True:
+        while True and not self._terminated:
             #log.info(self.workers_stat)
             #log.info(self.tasks_stat(short=False))
             log.info(self.tasks_stat(short=True))
-            time.sleep(0.5)
+            time.sleep(1)
 
     def _loop(self):
         while True and not self._terminated:
@@ -166,6 +167,8 @@ class Scheduler:
             self._empty_event.wait()
             self._terminated = True
             self.main_t.join()
+            if self.monitor_t:
+                self.monitor_t.join()
             self.state = self.STATE_STOPPED
         else:
             log.warn("Scheduler is not started or already stopping/stopped!")
