@@ -18,8 +18,9 @@ class Task:
     IN_PROGRESS = "IN_PROGRESS"
     DONE = "DONE"
 
-    def __init__(self, name, func, args, kwargs):
+    def __init__(self, name, func, args, kwargs, timeout=None):
         self.name = name
+        self.timeout = timeout
         self._func = func
         self._args = args
         self._kwargs = kwargs
@@ -71,6 +72,12 @@ class Task:
     @property
     def result(self):
         return self._result
+
+    @property
+    def timed_out(self):
+        if self.timeout and self.status == self.IN_PROGRESS:
+            return time.time() > self._events[self.IN_PROGRESS] + self.timeout
+        return False
 
     @property
     def done(self):

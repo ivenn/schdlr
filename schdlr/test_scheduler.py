@@ -127,3 +127,31 @@ def test_multiple_task_order_different_priority_2():
     check_scheduler_state(schdlr, Scheduler.STATE_STOPPED, 0, 0, 4, None)
     compare_task_list(schdlr.tasks_stat(short=False)["done"],
                       [task1, task2, task4, task3])
+
+
+def test_overdue_tasks():
+    schdlr = Scheduler(4)
+
+    task1 = Task('test-1', foo, (1,), {'to_sleep': 1, })
+    task2 = Task('test-2', foo, (1,), {'to_sleep': 1, })
+    task3 = Task('test-3', foo, (1,), {'to_sleep': 1, })
+
+    schdlr.start()
+    schdlr.add_task(task1, priority=PRIORITY_MID, timeout=0.1)
+    time.sleep(0.2)
+    assert len(schdlr.overdue_tasks) == 1
+
+    schdlr.add_task(task2, priority=PRIORITY_MID, timeout=0.1)
+    time.sleep(0.2)
+    assert len(schdlr.overdue_tasks) == 2
+
+    schdlr.add_task(task3, priority=PRIORITY_MID, timeout=0.1)
+    time.sleep(0.2)
+    assert len(schdlr.overdue_tasks) == 3
+
+    time.sleep(1)
+
+    assert len(schdlr.overdue_tasks) == 0
+
+    schdlr.stop()
+

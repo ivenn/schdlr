@@ -1,3 +1,5 @@
+import os
+import signal
 import time
 from queue import Empty, PriorityQueue
 from threading import Thread, Event, RLock
@@ -10,6 +12,17 @@ from .log import get_logger
 log = get_logger(__name__)
 
 
+class ExitCommand(Exception):
+    pass
+
+
+def scheduler_force_stop(signal, frame):
+    raise ExitCommand("Stopping Scheduler because of workers blocked by overdue tasks")
+
+
+signal.signal(signal.SIGUSR1, scheduler_force_stop)
+
+
 class Scheduler:
 
     STATE_NOT_STARTED = "NOT_STARTED"
@@ -19,9 +32,10 @@ class Scheduler:
     STATE_STOPPING = "STOPPING"
     STATE_STOPPED = "STOPPED"
 
-    def __init__(self, workers_num, monitor=False):
+    def __init__(self, workers_num, monitor=False, max_blocked_workers_ratio=1):
         self.workers_num = workers_num
         self.workers = []
+        self.max_blocked_workers_ratio = max_blocked_workers_ratio
 
         self._stat_lock = RLock()
         self._pqueue = PriorityQueue()
@@ -46,7 +60,7 @@ class Scheduler:
             state=self.state
         )
 
-    def add_task(self, task, priority=None):
+    def add_task(self, task, priority=None, timeout=None):
         if not isinstance(task, Task):
             return
 
@@ -57,6 +71,8 @@ class Scheduler:
         else:
             if priority:
                 task.priority = priority
+            if timeout:
+                task.timeout = timeout
             self._pqueue.put(task)
             if self.state == self.STATE_NOT_STARTED:
                 log.info("{task} was added to queue, but scheduler is not started".format(
@@ -84,9 +100,8 @@ class Scheduler:
         self.main_t = Thread(target=self._loop, name='schdlr')
         self.main_t.start()
 
-        if self.monitor:
-            self.monitor_t = Thread(target=self._monitor, name='monitor')
-            self.monitor_t.start()
+        self.monitor_t = Thread(target=self._monitor, name='monitor')
+        self.monitor_t.start()
 
         self.state = self.STATE_RUNNING
 
@@ -123,6 +138,10 @@ class Scheduler:
         return task_stat
 
     @property
+    def overdue_tasks(self):
+        return [task for task in self._in_progress if task.timed_out]
+
+    @property
     def stat(self):
         return self
 
@@ -130,7 +149,10 @@ class Scheduler:
         while True and not self._terminated:
             #log.info(self.workers_stat)
             #log.info(self.tasks_stat(short=False))
-            log.info(self.tasks_stat(short=True))
+            if self.monitor:
+                log.info(self.tasks_stat(short=True))
+            if (len(self.overdue_tasks) / self.workers_num) >= self.max_blocked_workers_ratio:
+                os.kill(os.getpid(), signal.SIGUSR1)
             time.sleep(1)
 
     def _loop(self):
@@ -146,7 +168,7 @@ class Scheduler:
 
             worker = None
             log.info("%s is waiting worker" % task)
-            while not worker:
+            while not worker and not self._terminated:
                 workers_ready = [w for w in self.workers if w.ready]
                 if workers_ready:
                     log.info("Worker found: %s" % workers_ready)
@@ -167,8 +189,7 @@ class Scheduler:
             self._empty_event.wait()
             self._terminated = True
             self.main_t.join()
-            if self.monitor_t:
-                self.monitor_t.join()
+            self.monitor_t.join()
             self.state = self.STATE_STOPPED
         else:
             log.warn("Scheduler is not started or already stopping/stopped!")
