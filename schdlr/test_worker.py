@@ -15,7 +15,7 @@ def foo_raise():
 
 
 def check_worker_state(worker, exp_status, exp_ready):
-    time.sleep(0.1) # to let state change
+    time.sleep(0.1)  # to let state change
     assert worker.status == exp_status
     assert worker.ready == exp_ready
 
