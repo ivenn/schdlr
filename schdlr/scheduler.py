@@ -1,6 +1,7 @@
 import os
 import signal
 import time
+import contextlib
 from queue import Empty, PriorityQueue
 from threading import Thread, Event, RLock
 
@@ -182,17 +183,30 @@ class Scheduler:
         for w in self.workers:
             w.stop(wait=True)
 
-    def stop(self,):
+    def stop(self, complete_enqueued=False):
         if self.state in [self.STATE_RUNNING, ]:
             log.info("Stopping scheduler...")
             self.state = self.STATE_STOPPING
-            self._empty_event.wait()
+            if not complete_enqueued:
+                self._empty_event.wait()
             self._terminated = True
             self.main_t.join()
             self.monitor_t.join()
             self.state = self.STATE_STOPPED
         else:
             log.warn("Scheduler is not started or already stopping/stopped!")
+
+
+@contextlib.contextmanager
+def schdlr(workers_num, monitor=False, max_blocked_workers_ratio=1):
+    scheduler = Scheduler(workers_num, monitor, max_blocked_workers_ratio)
+    scheduler.start()
+    try:
+        yield scheduler
+    finally:
+        scheduler.stop(complete_enqueued=True)
+
+
 
 
 

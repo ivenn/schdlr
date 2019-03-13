@@ -1,4 +1,4 @@
-from .task import Task, _undef_
+from schdlr.task import Task, _undef_
 
 
 def foo(a, b=1, c=0):
@@ -34,6 +34,7 @@ def test_simple_task_fail():
     task = Task('foo_task', foo_raise, (e,), {})
     task.execute()
     check_task_state(task, task.DONE, True, True, [task.PENDING, task.IN_PROGRESS, task.DONE])
+    assert isinstance(task.traceback, str) and 'line 9, in foo_raise' in task.traceback
     assert task.result is e
 
 

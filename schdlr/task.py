@@ -1,4 +1,5 @@
 import time
+import traceback
 
 
 class _undef_:
@@ -28,6 +29,7 @@ class Task:
         self._status = self.PENDING
         self._events = {self.PENDING: time.time()}  # tracking status change
         self._result = _undef_
+        self.traceback = _undef_
 
     def __repr__(self):
         return "Task(name={name}, func={func}, status={status})".format(
@@ -89,6 +91,7 @@ class Task:
             self._result = self._func(*self._args, **self._kwargs)
         except Exception as e:
             self._result = e
+            self.traceback = traceback.format_exc()
         finally:
             self.status = self.DONE
 

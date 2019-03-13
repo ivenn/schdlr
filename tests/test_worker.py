@@ -1,7 +1,7 @@
 import time
 
-from .worker import Worker
-from .task import Task
+from schdlr.worker import Worker
+from schdlr.task import Task
 
 
 def foo(a, b=1):

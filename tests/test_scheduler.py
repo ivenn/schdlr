@@ -1,7 +1,7 @@
 import time
 
-from .scheduler import Scheduler
-from .task import Task, _undef_, PRIORITY_LOW, PRIORITY_MID, PRIORITY_HI
+from schdlr.scheduler import Scheduler, schdlr
+from schdlr.task import Task, _undef_, PRIORITY_LOW, PRIORITY_MID, PRIORITY_HI
 
 
 def foo(to_return, to_sleep=0, to_raise=None):
@@ -63,7 +63,8 @@ def test_one_worker_one_task_pass_added_after_start():
     schdlr.start()
 
     schdlr.add_task(task)
-    check_scheduler_state(schdlr, Scheduler.STATE_RUNNING, 0, 0, 0, 'test-1')
+    time.sleep(0.1)
+    check_scheduler_state(schdlr, Scheduler.STATE_RUNNING, 0, 1, 0, None)
     schdlr.stop()
     assert task.done is True and task.result == 1
     check_scheduler_state(schdlr, Scheduler.STATE_STOPPED, 0, 0, 1, None)
@@ -154,4 +155,26 @@ def test_overdue_tasks():
     assert len(schdlr.overdue_tasks) == 0
 
     schdlr.stop()
+
+
+def test_complete_enqueued():
+    schdlr = Scheduler(4)
+
+    task1 = Task('test-1', foo, (1,), {'to_sleep': 1, })
+    task2 = Task('test-2', foo, (1,), {'to_sleep': 1, })
+    task3 = Task('test-3', foo, (1,), {'to_sleep': 1, })
+
+    schdlr.start()
+    schdlr.add_task(task1)
+    schdlr.add_task(task2)
+    schdlr.add_task(task3)
+
+    schdlr.stop()
+    check_scheduler_state(schdlr, Scheduler.STATE_STOPPED, 0, 0, 3, None)
+
+
+def test_schdlr_context_manager():
+    with schdlr(1) as scheduler:
+        scheduler.add_task(Task('test-1', foo, (1,), {'to_sleep': 1, }))
+
 
