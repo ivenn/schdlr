@@ -1,16 +1,15 @@
 import os
 import signal
 import time
-import contextlib
 from queue import Empty, PriorityQueue
 from threading import Thread, Event, RLock
 
-from .task import Task
+from .task import Task, SCHEDULED
 from .worker import Worker
 from .log import get_logger
 
 
-log = get_logger(__name__)
+logger = get_logger(__name__)
 
 
 class ExitCommand(Exception):
@@ -24,14 +23,13 @@ def scheduler_force_stop(signal, frame):
 signal.signal(signal.SIGUSR1, scheduler_force_stop)
 
 
+STATE_NOT_STARTED = "NOT_STARTED"
+STATE_RUNNING = "RUNNING"
+STATE_STOPPING = "STOPPING"
+STATE_STOPPED = "STOPPED"
+
+
 class Scheduler:
-
-    STATE_NOT_STARTED = "NOT_STARTED"
-
-    STATE_RUNNING = "RUNNING"
-
-    STATE_STOPPING = "STOPPING"
-    STATE_STOPPED = "STOPPED"
 
     def __init__(self, workers_num, monitor=False, max_blocked_workers_ratio=1):
         self.workers_num = workers_num
@@ -53,7 +51,7 @@ class Scheduler:
 
         self._terminated = False
         self._empty_event = Event()
-        self._state = self.STATE_NOT_STARTED
+        self._state = STATE_NOT_STARTED
 
     def __repr__(self):
         return "Scheduler(queue={queue}, state={state})".format(
@@ -65,8 +63,8 @@ class Scheduler:
         if not isinstance(task, Task):
             return
 
-        if self.state in [self.STATE_STOPPING, self.STATE_STOPPED]:
-            log.info("{task} will not be added, scheduler is stopping".format(
+        if self.state in [STATE_STOPPING, STATE_STOPPED]:
+            logger.info("{task} will not be added, scheduler is stopping".format(
                 task=task
             ))
         else:
@@ -74,13 +72,16 @@ class Scheduler:
                 task.priority = priority
             if timeout:
                 task.timeout = timeout
+
+            task.status = SCHEDULED
             self._pqueue.put(task)
-            if self.state == self.STATE_NOT_STARTED:
-                log.info("{task} was added to queue, but scheduler is not started".format(
+
+            if self.state == STATE_NOT_STARTED:
+                logger.info("{task} was added to queue, but scheduler is not started".format(
                     task=task
                 ))
             else:
-                log.info("{task} was added to queue".format(
+                logger.info("{task} was added to queue".format(
                     task=task
                 ))
 
@@ -90,7 +91,7 @@ class Scheduler:
 
     @state.setter
     def state(self, new_state):
-        log.info("{old} -> {new}".format(old=self._state, new=new_state))
+        logger.info("{old} -> {new}".format(old=self._state, new=new_state))
         self._state = new_state
 
     def start(self):
@@ -104,7 +105,7 @@ class Scheduler:
         self.monitor_t = Thread(target=self._monitor, name='monitor')
         self.monitor_t.start()
 
-        self.state = self.STATE_RUNNING
+        self.state = STATE_RUNNING
 
     @property
     def workers_stat(self):
@@ -148,10 +149,8 @@ class Scheduler:
 
     def _monitor(self):
         while True and not self._terminated:
-            #log.info(self.workers_stat)
-            #log.info(self.tasks_stat(short=False))
             if self.monitor:
-                log.info(self.tasks_stat(short=True))
+                logger.info(self.tasks_stat(short=True))
             if (len(self.overdue_tasks) / self.workers_num) >= self.max_blocked_workers_ratio:
                 os.kill(os.getpid(), signal.SIGUSR1)
             time.sleep(1)
@@ -161,22 +160,21 @@ class Scheduler:
             try:
                 task = self._pqueue.get(timeout=1)
                 self._waiting_worker = task.name
-                task.status = Task.SCHEDULED
             except Empty:
                 self._empty_event.set()
                 continue
             self._empty_event.clear()
 
             worker = None
-            log.info("%s is waiting worker" % task)
+            logger.info("%s is waiting worker" % task)
             while not worker and not self._terminated:
                 workers_ready = [w for w in self.workers if w.ready]
                 if workers_ready:
-                    log.info("Worker found: %s" % workers_ready)
+                    logger.info("Worker found: %s" % workers_ready)
                     worker = workers_ready[0]
                     self._waiting_worker = None
 
-            log.info("Assigning %s to %s" % (task, worker.name))
+            logger.info("Assigning %s to %s" % (task, worker.name))
             worker.do(task)
             self._in_progress.append(task)
 
@@ -184,27 +182,18 @@ class Scheduler:
             w.stop(wait=True)
 
     def stop(self, complete_enqueued=False):
-        if self.state in [self.STATE_RUNNING, ]:
-            log.info("Stopping scheduler...")
-            self.state = self.STATE_STOPPING
+        if self.state in [STATE_RUNNING, ]:
+            logger.info("Stopping scheduler...")
+            self.state = STATE_STOPPING
             if not complete_enqueued:
                 self._empty_event.wait()
             self._terminated = True
             self.main_t.join()
             self.monitor_t.join()
-            self.state = self.STATE_STOPPED
+            self.state = STATE_STOPPED
         else:
-            log.warn("Scheduler is not started or already stopping/stopped!")
+            logger.warn("Scheduler is not started or already stopping/stopped!")
 
-
-@contextlib.contextmanager
-def schdlr(workers_num, monitor=False, max_blocked_workers_ratio=1):
-    scheduler = Scheduler(workers_num, monitor, max_blocked_workers_ratio)
-    scheduler.start()
-    try:
-        yield scheduler
-    finally:
-        scheduler.stop(complete_enqueued=True)
 
 
 

@@ -1,8 +1,12 @@
-from schdlr.task import Task, _undef_
+from schdlr import task
 
 
 def foo(a, b=1, c=0):
     return a + b + c
+
+
+def no_return():
+    pass
 
 
 def foo_raise(to_raise):
@@ -17,29 +21,36 @@ def check_task_state(task, exp_status, epx_done, exp_failed, exp_log_keys):
 
 
 def test_init_state():
-    task = Task('foo_task', foo, (1,), {'b': 2, 'c': 3})
-    check_task_state(task, task.PENDING, False, False, [task.PENDING])
-    assert task.result is _undef_
+    t = task.Task('foo_task', foo, (1,), {'b': 2, 'c': 3})
+    check_task_state(t, task.PENDING, False, False, [task.PENDING])
+    assert t.result is task._undef_
 
 
 def test_simple_task_pass():
-    task = Task('foo_task', foo, (1,), {'b': 2, 'c': 3})
-    task.execute()
-    check_task_state(task, task.DONE, True, False, [task.PENDING, task.IN_PROGRESS, task.DONE])
-    assert task.result == 6
+    t = task.Task('foo_task', foo, (1,), {'b': 2, 'c': 3})
+    t.execute()
+    check_task_state(t, task.DONE, True, False, [task.PENDING, task.IN_PROGRESS, task.DONE])
+    assert t.result == 6
+
+
+def test_simple_task_pass_no_return():
+    t = task.Task('no_return', no_return, (), {})
+    t.execute()
+    check_task_state(t, task.DONE, True, False, [task.PENDING, task.IN_PROGRESS, task.DONE])
+    assert t.result is None
 
 
 def test_simple_task_fail():
     e = Exception('test')
-    task = Task('foo_task', foo_raise, (e,), {})
-    task.execute()
-    check_task_state(task, task.DONE, True, True, [task.PENDING, task.IN_PROGRESS, task.DONE])
-    assert isinstance(task.traceback, str) and 'line 9, in foo_raise' in task.traceback
-    assert task.result is e
+    t = task.Task('foo_task', foo_raise, (e,), {})
+    t.execute()
+    check_task_state(t, task.FAILED, False, True, [task.PENDING, task.IN_PROGRESS, task.FAILED])
+    assert isinstance(t.traceback, str) and 'in foo_raise' in t.traceback
+    assert t.result is e
 
 
 def test_unexpected_args():
-    task = Task('foo_task', foo, (1,), {'bb': 2, 'cc': 3})
-    task.execute()
-    check_task_state(task, task.DONE, True, True, [task.PENDING, task.IN_PROGRESS, task.DONE])
-    assert isinstance(task.result, TypeError)
+    t = task.Task('foo_task', foo, (1,), {'bb': 2, 'cc': 3})
+    t.execute()
+    check_task_state(t, task.FAILED, False, True, [task.PENDING, task.IN_PROGRESS, task.FAILED])
+    assert isinstance(t.result, TypeError)

@@ -11,13 +11,14 @@ PRIORITY_MID = 2
 PRIORITY_HI = 1
 DEFAULT_PRIORITY = PRIORITY_MID
 
+PENDING = "PENDING"
+SCHEDULED = "SCHEDULED"
+IN_PROGRESS = "IN_PROGRESS"
+FAILED = "FAILED"
+DONE = "DONE"
+
 
 class Task:
-
-    PENDING = "PENDING"
-    SCHEDULED = "SCHEDULED"
-    IN_PROGRESS = "IN_PROGRESS"
-    DONE = "DONE"
 
     def __init__(self, name, func, args, kwargs, timeout=None):
         self.name = name
@@ -26,15 +27,16 @@ class Task:
         self._args = args
         self._kwargs = kwargs
         self._priority = DEFAULT_PRIORITY
-        self._status = self.PENDING
-        self._events = {self.PENDING: time.time()}  # tracking status change
-        self._result = _undef_
+        self._status = PENDING
+        self._events = {PENDING: time.time()}  # tracking status change
+        self.result = _undef_
         self.traceback = _undef_
 
     def __repr__(self):
-        return "Task(name={name}, func={func}, status={status})".format(
-                name=self.name, func=self._func.__name__, status=self.status
-        )
+        #return "Task(name={name}, func={func}, status={status})".format(
+        #        name=self.name, func=self._func.__name__, status=self.status
+        #)
+        return "Task(name={name})".format(name=self.name)
 
     def __lt__(self, other):
         # to be handled correctly by PriorityQueue
@@ -60,7 +62,11 @@ class Task:
 
     @property
     def failed(self):
-        return isinstance(self._result, Exception)
+        return self._status == FAILED
+
+    @property
+    def done(self):
+        return self._status == DONE
 
     @property
     def status(self):
@@ -72,27 +78,17 @@ class Task:
         self._status = new_status
 
     @property
-    def result(self):
-        return self._result
-
-    @property
     def timed_out(self):
-        if self.timeout and self.status == self.IN_PROGRESS:
-            return time.time() > self._events[self.IN_PROGRESS] + self.timeout
+        if self.timeout and self.status == IN_PROGRESS:
+            return time.time() > self._events[IN_PROGRESS] + self.timeout
         return False
 
-    @property
-    def done(self):
-        return self.status == self.DONE and self.result is not _undef_
-
     def execute(self):
-        self.status = self.IN_PROGRESS
+        self.status = IN_PROGRESS
         try:
-            self._result = self._func(*self._args, **self._kwargs)
+            self.result = self._func(*self._args, **self._kwargs)
+            self.status = DONE
         except Exception as e:
-            self._result = e
+            self.result = e
             self.traceback = traceback.format_exc()
-        finally:
-            self.status = self.DONE
-
-
+            self.status = FAILED
