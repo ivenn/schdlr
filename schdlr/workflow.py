@@ -1,11 +1,9 @@
+import random
+import string
 import networkx as nx
 
-
-from schdlr import log
+from schdlr import etc
 from schdlr import task
-
-
-logger = log.get_logger(__name__)
 
 
 class DummyNode:
@@ -16,7 +14,7 @@ class DummyNode:
         self.failed = False
 
     @property
-    def status(self):
+    def state(self):
         return task.DONE if self.done else task.PENDING
 
     def __repr__(self):
@@ -66,16 +64,20 @@ def build_DAG(deps):
 NOT_STARTED = "NOT_STARTED"
 IN_PROGRESS = "IN_PROGRESS"
 FAILED = "FAILED"
-COMPLETE = "COMPLETE"
+COMPLETED = "COMPLETED"
 
 
 class Workflow:
 
-    def __init__(self, deps):
+    def __init__(self, deps, name=None):
         """
         :param deps: dependencies dict
          task1: [task2,task3] -> task1 depends on task2 and task3
         """
+        self.name = name if name else "".join(
+            [random.choice(string.ascii_letters) for _ in range(2)] +
+            [str(random.randint(0, 10)) for _ in range(2)]
+        )
         self.deps = deps
         self.g, self.start, self.end = build_DAG(self.deps)
         self._state = NOT_STARTED
@@ -83,6 +85,7 @@ class Workflow:
         self.tasks_to_do = [self.start, ]
         self.tasks_in_progress = []
         self.tasks_done = []
+        self.logger = etc.get_logger("wflow.{name}".format(name=self.name))
 
     def print(self):
         import matplotlib.pyplot as plt
@@ -92,15 +95,15 @@ class Workflow:
     @property
     def state(self):
         if self._state == NOT_STARTED:
-            if any([t.status != task.PENDING for t in self.g.successors(self.start)]):
-                logger.info("{old} -> {new}".format(old=self._state, new=IN_PROGRESS))
+            if any([t.state != task.PENDING for t in self.g.successors(self.start)]):
+                self.logger.info("{old} -> {new}".format(old=self._state, new=IN_PROGRESS))
                 self._state = IN_PROGRESS
 
         return self._state
 
     @state.setter
     def state(self, new_state):
-        logger.info("{old} -> {new}".format(old=self._state, new=new_state))
+        self.logger.info("{old} -> {new}".format(old=self._state, new=new_state))
         self._state = new_state
 
     @property
@@ -108,17 +111,17 @@ class Workflow:
         return self.end.done
 
     def to_do(self):
-        if self.state in [FAILED, COMPLETE]:
+        if self.state in [FAILED, COMPLETED]:
             return None
 
         to_do = set()
         in_progress = set()
         for v in self.tasks_in_progress + self.tasks_to_do:
-            if v.status == task.PENDING:
+            if v.state == task.PENDING:
                 to_do.add(v)
-            elif v.status in [task.SCHEDULED, task.IN_PROGRESS]:
+            elif v.state in [task.SCHEDULED, task.IN_PROGRESS]:
                 in_progress.add(v)
-            elif v.status == task.FAILED:
+            elif v.state == task.FAILED:
                 self.state = FAILED
                 return None
             else:  # task.DONE
@@ -132,7 +135,7 @@ class Workflow:
 
         if to_do == {self.end} and not in_progress:
             self.end.done = True
-            self.state = COMPLETE
+            self.state = COMPLETED
             return None
 
         self.tasks_to_do = list(to_do)

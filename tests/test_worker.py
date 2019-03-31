@@ -14,10 +14,10 @@ def foo_raise():
     raise Exception("Test exception")
 
 
-def check_worker_state(worker, exp_status, exp_ready):
+def check_worker_state(wrkr, exp_state, exp_ready):
     time.sleep(0.1)  # to let state change
-    assert worker.status == exp_status
-    assert worker.ready == exp_ready
+    assert wrkr.state == exp_state
+    assert wrkr.ready == exp_ready
 
 
 def test_basic_states():

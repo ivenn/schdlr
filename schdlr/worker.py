@@ -1,11 +1,8 @@
 from queue import Queue
-from threading import Thread, Event, RLock
+from threading import Thread, Event
 
-from .task import Task
-from .log import get_logger
-
-
-logger = get_logger(__name__)
+from schdlr import task
+from schdlr import etc
 
 
 class WorkerStop(Exception):
@@ -26,26 +23,24 @@ class Worker:
         self._t = None
         self._terminated = None
         self._inbox = Queue()
-        self._status_lock = RLock()
         self._ready = Event()
-        self._status = NOT_STARTED
+        self._state = NOT_STARTED
+        self.logger = etc.get_logger("worker.{name}".format(name=self.name))
 
     def __repr__(self):
-        return "Worker({name}): {status}".format(
-            name=self.name, status=self._status)
+        return "Worker({name}): {state}".format(
+            name=self.name, state=self._state)
 
     @property
-    def status(self):
-        with self._status_lock:
-            return self._status
+    def state(self):
+        return self._state
 
-    @status.setter
-    def status(self, new_status):
-        logger.info("{old} -> {new}".format(old=self._status, new=new_status))
-        with self._status_lock:
-            if new_status in [STOPPING, STOPPED]:
-                self.ready = False
-            self._status = new_status
+    @state.setter
+    def state(self, new_state):
+        self.logger.info("{old} -> {new}".format(old=self._state, new=new_state))
+        self._state = new_state
+        if new_state in [STOPPING, STOPPED]:
+            self.ready = False
 
     @property
     def ready(self):
@@ -67,33 +62,33 @@ class Worker:
 
     def stop(self, wait=False):
         self._inbox.put(WorkerStop)
-        self.status = STOPPING
+        self.state = STOPPING
         if wait:
             self._terminated.wait()
-        self.status = STOPPED
+        self.state = STOPPED
 
     def _loop(self):
         try:
             while True:
-                self.status = IDLE
-                task = self._inbox.get()
+                self.state = IDLE
+                tsk = self._inbox.get()
 
-                if task is WorkerStop:
+                if tsk is WorkerStop:
                     break
-                elif isinstance(task, Task):
-                    logger.info("Processing %s" % task)
-                    self.status = PROCESSING
-                    task.execute()
-                    logger.info("%s is done" % task)
+                elif isinstance(tsk, task.Task):
+                    self.logger.info("Processing %s" % tsk)
+                    self.state = PROCESSING
+                    tsk.execute()
+                    self.logger.info("%s is done" % tsk)
                 else:
-                    logger.info("Unexpected task: %s" % task)
+                    self.logger.info("Unexpected task: %s" % tsk)
 
                 if self._inbox.empty():
                     self.ready = True
         finally:
             self._terminated.set()
 
-    def do(self, task, block=True):
+    def do(self, tsk, block=True):
         if block:
             self.ready = False
-        self._inbox.put(task)
+        self._inbox.put(tsk)

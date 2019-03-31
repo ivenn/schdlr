@@ -2,6 +2,7 @@ import time
 
 from schdlr import scheduler
 from schdlr import task
+from schdlr import etc
 
 
 def foo(to_return, to_sleep=0, to_raise=None):
@@ -46,7 +47,7 @@ def test_one_worker_one_task_pass_added_before_start():
     task1 = task.Task('test-1', foo, (1,), {'to_sleep': 0.3, })
 
     schdlr.add_task(task1)
-    assert task1.done is False and task1.result is task._undef_
+    assert task1.done is False and task1.result is etc._undef_
     schdlr.start()
     time.sleep(0.1)
     check_scheduler_state(schdlr, scheduler.STATE_RUNNING, 0, 1, 0, None)
@@ -59,7 +60,7 @@ def test_one_worker_one_task_pass_added_after_start():
     schdlr = scheduler.Scheduler(1)
     task1 = task.Task('test-1', foo, (1,), {'to_sleep': 0.3, })
 
-    assert task1.done is False and task1.result is task._undef_
+    assert task1.done is False and task1.result is etc._undef_
     schdlr.start()
 
     schdlr.add_task(task1)

@@ -4,12 +4,13 @@ import time
 from queue import Empty, PriorityQueue
 from threading import Thread, Event, RLock
 
-from .task import Task, SCHEDULED
-from .worker import Worker
-from .log import get_logger
+from schdlr import task
+from schdlr import etc
+from schdlr import worker
+from schdlr import workflow
 
 
-logger = get_logger(__name__)
+logger = etc.get_logger(__name__)
 
 
 class ExitCommand(Exception):
@@ -37,9 +38,10 @@ class Scheduler:
         self.max_blocked_workers_ratio = max_blocked_workers_ratio
 
         self._stat_lock = RLock()
+        self._wf_lock = RLock()
         self._pqueue = PriorityQueue()
-        self._in_progress = []
-        self._done = []
+        self._tasks_in_progress = []
+        self._tasks_done = []
         self._waiting_worker = None
 
         self.main_t = None
@@ -59,31 +61,35 @@ class Scheduler:
             state=self.state
         )
 
-    def add_task(self, task, priority=None, timeout=None):
-        if not isinstance(task, Task):
+    def add_task(self, new_task, priority=None, timeout=None):
+        if not isinstance(new_task, task.Task):
             return
 
         if self.state in [STATE_STOPPING, STATE_STOPPED]:
             logger.info("{task} will not be added, scheduler is stopping".format(
-                task=task
+                task=new_task
             ))
         else:
             if priority:
-                task.priority = priority
+                new_task.priority = priority
             if timeout:
-                task.timeout = timeout
+                new_task.timeout = timeout
 
-            task.status = SCHEDULED
-            self._pqueue.put(task)
+            new_task.state = task.SCHEDULED
+            self._pqueue.put(new_task)
 
             if self.state == STATE_NOT_STARTED:
                 logger.info("{task} was added to queue, but scheduler is not started".format(
-                    task=task
+                    task=new_task
                 ))
             else:
                 logger.info("{task} was added to queue".format(
-                    task=task
+                    task=new_task
                 ))
+
+    def add_workflow(self, wf):
+        with self._wf_lock:
+            self.workflows.append(wf)
 
     @property
     def state(self):
@@ -95,7 +101,7 @@ class Scheduler:
         self._state = new_state
 
     def start(self):
-        self.workers = [Worker("work-%s" % i) for i in range(self.workers_num)]
+        self.workers = [worker.Worker("work-%s" % i) for i in range(self.workers_num)]
         for w in self.workers:
             w.start()
 
@@ -115,33 +121,33 @@ class Scheduler:
         with self._stat_lock:
             newly_done = []
             new_in_progress = []
-            for task in self._in_progress:
-                if task.done:
-                    newly_done.append(task)
+            for t in self._tasks_in_progress:
+                if t.done:
+                    newly_done.append(t)
                 else:
-                    new_in_progress.append(task)
+                    new_in_progress.append(t)
 
-            self._in_progress = new_in_progress
-            self._done += newly_done
+            self._tasks_in_progress = new_in_progress
+            self._tasks_done += newly_done
 
     def tasks_stat(self, short=False):
         self._recalculate_task_stat()
         if short:
             task_stat = {
                 'in_queue': len(list(self._pqueue.queue)),
-                'in_progress': len(self._in_progress),
+                'in_progress': len(self._tasks_in_progress),
                 'waiting_for_worker': self._waiting_worker,
-                'done': len(self._done)}
+                'done': len(self._tasks_done)}
         else:
             task_stat = {
                 'in_queue': list(self._pqueue.queue),
-                'in_progress': self._in_progress,
-                'done': self._done}
+                'in_progress': self._tasks_in_progress,
+                'done': self._tasks_done}
         return task_stat
 
     @property
     def overdue_tasks(self):
-        return [task for task in self._in_progress if task.timed_out]
+        return [t for t in self._tasks_in_progress if t.timed_out]
 
     @property
     def stat(self):
@@ -156,17 +162,28 @@ class Scheduler:
             time.sleep(1)
 
     def _loop(self):
-        while True and not self._terminated:
+        while not self._terminated:
+            workflows = []
+            for wf in self.workflows:
+                tasks = wf.to_do()
+                if tasks is None and wf.state == workflow.COMPLETED:
+                    continue
+                for t in tasks:
+                    self.add_task(t)
+                workflows.append(wf)
+            with self._wf_lock:
+                self.workflows = workflows
+
             try:
-                task = self._pqueue.get(timeout=1)
-                self._waiting_worker = task.name
+                tsk = self._pqueue.get(timeout=0.1)
+                self._waiting_worker = tsk.name
             except Empty:
                 self._empty_event.set()
                 continue
             self._empty_event.clear()
 
             worker = None
-            logger.info("%s is waiting worker" % task)
+            logger.info("%s is waiting worker" % tsk)
             while not worker and not self._terminated:
                 workers_ready = [w for w in self.workers if w.ready]
                 if workers_ready:
@@ -174,9 +191,9 @@ class Scheduler:
                     worker = workers_ready[0]
                     self._waiting_worker = None
 
-            logger.info("Assigning %s to %s" % (task, worker.name))
-            worker.do(task)
-            self._in_progress.append(task)
+            logger.info("Assigning %s to %s" % (tsk, worker.name))
+            worker.do(tsk)
+            self._tasks_in_progress.append(tsk)
 
         for w in self.workers:
             w.stop(wait=True)

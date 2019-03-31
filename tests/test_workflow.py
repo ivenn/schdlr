@@ -6,27 +6,27 @@ class DummyTask:
 
     def __init__(self, name):
         self.name = name
-        self._status = task.PENDING
+        self._state = task.PENDING
 
     def __repr__(self):
-        return "Task({name}, {status})".format(
-            name=self.name, status=self._status)
+        return "Task({name}, {state})".format(
+            name=self.name, state=self._state)
 
     @property
     def failed(self):
-        return self._status == task.FAILED
+        return self._state == task.FAILED
 
     @property
     def done(self):
-        return self._status == task.DONE
+        return self._state == task.DONE
 
     @property
-    def status(self):
-        return self._status
+    def state(self):
+        return self._state
 
-    @status.setter
-    def status(self, new_status):
-        self._status = new_status
+    @state.setter
+    def state(self, new_state):
+        self._state = new_state
 
 
 def check_wf_state(wf, exp_state,
@@ -64,34 +64,34 @@ def test_chain_workflow():
     check_wf_state(wf, workflow.NOT_STARTED,
                    exp_to_do=[t1, ], exp_in_progress=[], exp_done=[])
 
-    t1.status = task.SCHEDULED
+    t1.state = task.SCHEDULED
     to_do = wf.to_do()
     assert to_do == [], "{act} != {exp}".format(act=to_do, exp=[])
     check_wf_state(wf, workflow.IN_PROGRESS,
                    exp_to_do=[], exp_in_progress=[t1, ], exp_done=[])
 
-    t1.status = task.IN_PROGRESS
+    t1.state = task.IN_PROGRESS
     to_do = wf.to_do()
     assert to_do == [], "{act} != {exp}".format(act=to_do, exp=[])
     check_wf_state(wf, workflow.IN_PROGRESS,
                    exp_to_do=[], exp_in_progress=[t1, ], exp_done=[])
 
-    t1.status = task.DONE
+    t1.state = task.DONE
     to_do = wf.to_do()
     assert to_do == [t2, ], "{act} != {exp}".format(act=to_do, exp=[t2, ])
     check_wf_state(wf, workflow.IN_PROGRESS,
                    exp_to_do=[t2, ], exp_in_progress=[], exp_done=[t1, ])
 
-    t2.status = task.DONE
+    t2.state = task.DONE
     to_do = wf.to_do()
     assert to_do == [t3, ], "{act} != {exp}".format(act=to_do, exp=[t3, ])
     check_wf_state(wf, workflow.IN_PROGRESS,
                    exp_to_do=[t3, ], exp_in_progress=[], exp_done=[t1, t2, ])
 
-    t3.status = task.DONE
+    t3.state = task.DONE
     to_do = wf.to_do()
     assert to_do is None, "{act} != {exp}".format(act=to_do, exp=None)
-    check_wf_state(wf, workflow.COMPLETE,
+    check_wf_state(wf, workflow.COMPLETED,
                    exp_to_do=None, exp_in_progress=[], exp_done=[t1, t2, t3])
 
 
@@ -113,37 +113,37 @@ def test_parallel_tasks_workflow():
     check_wf_state(wf, workflow.NOT_STARTED,
                    exp_to_do=[t1, ], exp_in_progress=[], exp_done=[])
 
-    t1.status = task.DONE
+    t1.state = task.DONE
     to_do = wf.to_do()
     assert set(to_do) == set([t2, t3, t4]), "{act} != {exp}".format(act=to_do, exp=[t2, t3, t4])
     check_wf_state(wf, workflow.IN_PROGRESS,
                    exp_to_do=[t2, t3, t4], exp_in_progress=[], exp_done=[t1, ])
 
-    t2.status = task.IN_PROGRESS
-    t3.status = task.IN_PROGRESS
-    t4.status = task.IN_PROGRESS
+    t2.state = task.IN_PROGRESS
+    t3.state = task.IN_PROGRESS
+    t4.state = task.IN_PROGRESS
     to_do = wf.to_do()
     assert to_do == [], "{act} != {exp}".format(act=to_do, exp=[])
     check_wf_state(wf, workflow.IN_PROGRESS,
                    exp_to_do=[], exp_in_progress=[t2, t3, t4], exp_done=[t1, ])
 
-    t2.status = task.DONE
+    t2.state = task.DONE
     to_do = wf.to_do()
     assert to_do == [], "{act} != {exp}".format(act=to_do, exp=[])
     check_wf_state(wf, workflow.IN_PROGRESS,
                    exp_to_do=[], exp_in_progress=[t3, t4], exp_done=[t1, t2])
 
-    t3.status = task.DONE
-    t4.status = task.DONE
+    t3.state = task.DONE
+    t4.state = task.DONE
     to_do = wf.to_do()
     assert to_do == [t5, ], "{act} != {exp}".format(act=to_do, exp=[t5, ])
     check_wf_state(wf, workflow.IN_PROGRESS,
                    exp_to_do=[t5, ], exp_in_progress=[], exp_done=[t1, t2, t3, t4])
 
-    t5.status = task.DONE
+    t5.state = task.DONE
     to_do = wf.to_do()
     assert to_do is None, "{act} != {exp}".format(act=to_do, exp=None)
-    check_wf_state(wf, workflow.COMPLETE,
+    check_wf_state(wf, workflow.COMPLETED,
                    exp_to_do=None, exp_in_progress=[], exp_done=[t1, t2, t3, t4, t5])
 
     def test_complex_workflow():

@@ -1,4 +1,5 @@
 from schdlr import task
+from schdlr import etc
 
 
 def foo(a, b=1, c=0):
@@ -13,17 +14,17 @@ def foo_raise(to_raise):
     raise to_raise
 
 
-def check_task_state(task, exp_status, epx_done, exp_failed, exp_log_keys):
-    assert task.status == exp_status
-    assert task.done == epx_done
-    assert task.failed == exp_failed
-    assert set(task.log.keys()) == set(exp_log_keys)
+def check_task_state(t, exp_state, epx_done, exp_failed, exp_log_keys):
+    assert t.state == exp_state
+    assert t.done == epx_done
+    assert t.failed == exp_failed
+    assert set(t.events.keys()) == set(exp_log_keys)
 
 
 def test_init_state():
     t = task.Task('foo_task', foo, (1,), {'b': 2, 'c': 3})
     check_task_state(t, task.PENDING, False, False, [task.PENDING])
-    assert t.result is task._undef_
+    assert t.result is etc._undef_
 
 
 def test_simple_task_pass():
