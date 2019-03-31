@@ -95,6 +95,7 @@ class Workflow:
     @property
     def state(self):
         if self._state == NOT_STARTED:
+            # recalculate tasks ??
             if any([t.state != task.PENDING for t in self.g.successors(self.start)]):
                 self.logger.info("{old} -> {new}".format(old=self._state, new=IN_PROGRESS))
                 self._state = IN_PROGRESS
