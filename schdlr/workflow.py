@@ -93,6 +93,11 @@ class Workflow:
         plt.show()
 
     @property
+    def tasks(self):
+        return [node for node in self.g.nodes
+                if node not in [self.start, self.end]]
+
+    @property
     def state(self):
         if self._state == NOT_STARTED:
             # recalculate tasks ??
