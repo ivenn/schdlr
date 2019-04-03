@@ -15,3 +15,8 @@ def get_logger(name, stdout=True):
         logger.addHandler(handler)
 
     return logger
+
+
+class _undef_:
+    pass
+

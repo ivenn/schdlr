@@ -1,8 +1,7 @@
 import time
+import traceback
 
-
-class _undef_:
-    pass
+from schdlr import etc
 
 
 PRIORITY_LOW = 3
@@ -10,13 +9,14 @@ PRIORITY_MID = 2
 PRIORITY_HI = 1
 DEFAULT_PRIORITY = PRIORITY_MID
 
+PENDING = "PENDING"
+SCHEDULED = "SCHEDULED"
+IN_PROGRESS = "IN_PROGRESS"
+FAILED = "FAILED"
+DONE = "DONE"
+
 
 class Task:
-
-    PENDING = "PENDING"
-    SCHEDULED = "SCHEDULED"
-    IN_PROGRESS = "IN_PROGRESS"
-    DONE = "DONE"
 
     def __init__(self, name, func, args, kwargs, timeout=None):
         self.name = name
@@ -25,18 +25,36 @@ class Task:
         self._args = args
         self._kwargs = kwargs
         self._priority = DEFAULT_PRIORITY
-        self._status = self.PENDING
-        self._events = {self.PENDING: time.time()}  # tracking status change
-        self._result = _undef_
+        self.result = etc._undef_
+        self.traceback = etc._undef_
+        self._state = PENDING
+        self._events = {self._state: time.time()}
+        self.logger = etc.get_logger("task.{name}".format(name=self.name))
 
     def __repr__(self):
-        return "Task(name={name}, func={func}, status={status})".format(
-                name=self.name, func=self._func.__name__, status=self.status
-        )
+        return "Task(name={name}, state={state})".format(
+            name=self.name, state=self.state)
 
     def __lt__(self, other):
-        # to be handled correctly by PriorityQueue
+        # to be handled correctly by Scheduler's PriorityQueue
         return self.priority < other.priority
+
+    @property
+    def events(self):
+        return self._events
+
+    def _log_event(self, event):
+        self._events[event] = time.time()
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, new_state):
+        self._log_event(new_state)
+        self.logger.info("{old} -> {new}".format(old=self._state, new=new_state))
+        self._state = new_state
 
     @property
     def priority(self):
@@ -49,47 +67,26 @@ class Task:
         ))
         self._priority = int(priority)
 
-    def _log_event(self, event):
-        self._events[event] = time.time()
-
-    @property
-    def log(self):
-        return self._events
-
     @property
     def failed(self):
-        return isinstance(self._result, Exception)
-
-    @property
-    def status(self):
-        return self._status
-
-    @status.setter
-    def status(self, new_status):
-        self._log_event(new_status)
-        self._status = new_status
-
-    @property
-    def result(self):
-        return self._result
-
-    @property
-    def timed_out(self):
-        if self.timeout and self.status == self.IN_PROGRESS:
-            return time.time() > self._events[self.IN_PROGRESS] + self.timeout
-        return False
+        return self.state == FAILED
 
     @property
     def done(self):
-        return self.status == self.DONE and self.result is not _undef_
+        return self.state == DONE
+
+    @property
+    def timed_out(self):
+        if self.timeout and self.state == IN_PROGRESS:
+            return time.time() > self._events[IN_PROGRESS] + self.timeout
+        return False
 
     def execute(self):
-        self.status = self.IN_PROGRESS
+        self.state = IN_PROGRESS
         try:
-            self._result = self._func(*self._args, **self._kwargs)
+            self.result = self._func(*self._args, **self._kwargs)
+            self.state = DONE
         except Exception as e:
-            self._result = e
-        finally:
-            self.status = self.DONE
-
-
+            self.result = e
+            self.traceback = traceback.format_exc()
+            self.state = FAILED
