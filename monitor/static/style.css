@@ -26,3 +26,12 @@ body {
     background-color: #4CAF50;
     color: white;
 }
+
+.details {
+    position: absolute;
+    background: #ddd;
+    padding: 4px;
+    width: 300px;
+    display: none;
+}
+a:hover + .details, .details:hover { display: block; }

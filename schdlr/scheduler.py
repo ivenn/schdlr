@@ -108,7 +108,6 @@ class Scheduler:
         self.main_t = Thread(target=self._loop, name='schdlr')
         self.main_t.start()
 
-        #self.monitor_t = Thread(target=self._monitor, name='monitor')
         self.monitor_t = Thread(target=monitor.run_monitor,
                                 args=(self, ), name='monitor')
         self.monitor_t.daemon = True
@@ -131,18 +130,19 @@ class Scheduler:
             tasks_done += w.tasks_done
         return tasks_done
 
-    def tasks_stat(self, short=False):
-        if short:
+    def tasks_stat(self, detailed=False):
+        if detailed:
             task_stat = {
-                'in_queue': len(list(self._pqueue.queue)),
-                'in_progress': len(self.tasks_in_progress),
+                'in_queue': list(self._pqueue.queue),
+                'in_progress': {w: w.task_in_progress for w in self.workers},
                 'waiting_for_worker': self._waiting_worker,
-                'done': len(self.tasks_done)
+                'done': {w: w.tasks_done for w in self.workers}
             }
         else:
             task_stat = {
                 'in_queue': list(self._pqueue.queue),
                 'in_progress': self.tasks_in_progress,
+                'waiting_for_worker': self._waiting_worker,
                 'done': self.tasks_done
             }
         return task_stat

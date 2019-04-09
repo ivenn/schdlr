@@ -1,26 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
+{% extends "base.html" %}
 
-<head>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css')}}">
-    <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.0/jquery.min.js"></script>
-</head>
+{% set active_page = 'index' %}
 
-
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-
-    <body>
-        <div id="topnav" class="topnav">
-          <a class=" active" href="#home">home</a>
-          <a class="" href="#scheduler">scheduler</a>
-          <a class="" href="#workflows">workflows</a>
-          <a class="" href="#regular">regular</a>
-        </div>
-
-        <div id="schdlr_stat">{{stat}}</div>
-        <script type="text/javascript" src="{{ url_for('static', filename='script.js')}}"></script>
-    </body>
-
-</html>
-
+{% block content %}
+    <div id="index">INDEX TBD</div>
+{% endblock %}
