@@ -1,3 +1,4 @@
+import collections
 import time
 import traceback
 
@@ -28,7 +29,7 @@ class Task:
         self.result = etc._undef_
         self.traceback = etc._undef_
         self._state = PENDING
-        self._events = {self._state: time.time()}
+        self._events = collections.OrderedDict({self._state: time.time()})
         self.logger = etc.get_logger("task.{name}".format(name=self.name))
 
     def __repr__(self):

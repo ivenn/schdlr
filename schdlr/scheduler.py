@@ -8,6 +8,7 @@ from schdlr import task
 from schdlr import etc
 from schdlr import worker
 from schdlr import workflow
+from monitor import monitor
 
 
 logger = etc.get_logger(__name__)
@@ -40,15 +41,14 @@ class Scheduler:
         self._stat_lock = RLock()
         self._wf_lock = RLock()
         self._pqueue = PriorityQueue()
-        self._tasks_in_progress = []
-        self._tasks_done = []
         self._waiting_worker = None
 
         self.main_t = None
         self.monitor = monitor
         self.monitor_t = None  # TODO: should provide web interface
 
-        self.workflows = []
+        self.workflows = {}
+        self.workflows_done = {}
         self.periodic = []
 
         self._terminated = False
@@ -89,7 +89,7 @@ class Scheduler:
 
     def add_workflow(self, wf):
         with self._wf_lock:
-            self.workflows.append(wf)
+            self.workflows[wf.name] = wf
 
     @property
     def state(self):
@@ -108,7 +108,9 @@ class Scheduler:
         self.main_t = Thread(target=self._loop, name='schdlr')
         self.main_t.start()
 
-        self.monitor_t = Thread(target=self._monitor, name='monitor')
+        self.monitor_t = Thread(target=monitor.run_monitor,
+                                args=(self, ), name='monitor')
+        self.monitor_t.daemon = True
         self.monitor_t.start()
 
         self.state = STATE_RUNNING
@@ -117,37 +119,38 @@ class Scheduler:
     def workers_stat(self):
         return self.workers
 
-    def _recalculate_task_stat(self):
-        with self._stat_lock:
-            newly_done = []
-            new_in_progress = []
-            for t in self._tasks_in_progress:
-                if t.done:
-                    newly_done.append(t)
-                else:
-                    new_in_progress.append(t)
+    @property
+    def tasks_in_progress(self):
+        return [w.task_in_progress for w in self.workers if w.task_in_progress]
 
-            self._tasks_in_progress = new_in_progress
-            self._tasks_done += newly_done
+    @property
+    def tasks_done(self):
+        tasks_done = []
+        for w in self.workers:
+            tasks_done += w.tasks_done
+        return tasks_done
 
-    def tasks_stat(self, short=False):
-        self._recalculate_task_stat()
-        if short:
+    def tasks_stat(self, detailed=False):
+        if detailed:
             task_stat = {
-                'in_queue': len(list(self._pqueue.queue)),
-                'in_progress': len(self._tasks_in_progress),
+                'in_queue': list(self._pqueue.queue),
+                'in_progress': {w: w.task_in_progress for w in self.workers},
                 'waiting_for_worker': self._waiting_worker,
-                'done': len(self._tasks_done)}
+                'done': {w: w.tasks_done for w in self.workers}
+            }
         else:
             task_stat = {
                 'in_queue': list(self._pqueue.queue),
-                'in_progress': self._tasks_in_progress,
-                'done': self._tasks_done}
+                'in_progress': self.tasks_in_progress,
+                'waiting_for_worker': self._waiting_worker,
+                'done': self.tasks_done
+            }
         return task_stat
 
     @property
     def overdue_tasks(self):
-        return [t for t in self._tasks_in_progress if t.timed_out]
+        return [w.task_in_progress for w in self.workers
+                if w.task_in_progress.timed_out]
 
     @property
     def stat(self):
@@ -163,14 +166,15 @@ class Scheduler:
 
     def _loop(self):
         while not self._terminated:
-            workflows = []
-            for wf in self.workflows:
+            workflows = {}
+            for wf in self.workflows.values():
                 tasks = wf.to_do()
                 if tasks is None and wf.state == workflow.COMPLETED:
+                    self.workflows_done[wf.name] = wf
                     continue
                 for t in tasks:
                     self.add_task(t)
-                workflows.append(wf)
+                workflows[wf.name] = wf
             with self._wf_lock:
                 self.workflows = workflows
 
@@ -193,7 +197,6 @@ class Scheduler:
 
             logger.info("Assigning %s to %s" % (tsk, worker.name))
             worker.do(tsk)
-            self._tasks_in_progress.append(tsk)
 
         for w in self.workers:
             w.stop(wait=True)
@@ -206,7 +209,7 @@ class Scheduler:
                 self._empty_event.wait()
             self._terminated = True
             self.main_t.join()
-            self.monitor_t.join()
+            #self.monitor_t.join()
             self.state = STATE_STOPPED
         else:
             logger.warn("Scheduler is not started or already stopping/stopped!")

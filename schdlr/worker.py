@@ -25,6 +25,8 @@ class Worker:
         self._inbox = Queue()
         self._ready = Event()
         self._state = NOT_STARTED
+        self.task_in_progress = None
+        self.tasks_done = []
         self.logger = etc.get_logger("worker.{name}".format(name=self.name))
 
     def __repr__(self):
@@ -78,7 +80,10 @@ class Worker:
                 elif isinstance(tsk, task.Task):
                     self.logger.info("Processing %s" % tsk)
                     self.state = PROCESSING
+                    self.task_in_progress = tsk
                     tsk.execute()
+                    self.task_in_progress = None
+                    self.tasks_done.append(tsk)
                     self.logger.info("%s is done" % tsk)
                 else:
                     self.logger.info("Unexpected task: %s" % tsk)
