@@ -22,9 +22,9 @@ class Task:
     def __init__(self, name, func, args, kwargs, timeout=None):
         self.name = name
         self.timeout = timeout
-        self._func = func
-        self._args = args
-        self._kwargs = kwargs
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
         self._priority = DEFAULT_PRIORITY
         self.result = etc._undef_
         self.traceback = etc._undef_
@@ -85,7 +85,7 @@ class Task:
     def execute(self):
         self.state = IN_PROGRESS
         try:
-            self.result = self._func(*self._args, **self._kwargs)
+            self.result = self.func(*self.args, **self.kwargs)
             self.state = DONE
         except Exception as e:
             self.result = e

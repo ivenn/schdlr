@@ -1,5 +1,6 @@
 import time
 
+from schdlr.repeated import to_repeat
 from schdlr.scheduler import Scheduler
 from schdlr.task import Task
 from schdlr.workflow import Workflow
@@ -42,6 +43,9 @@ def main():
     t10, t11, t12, t13 = get_printer_tasks(4)
     deps3 = {t10: [], t11: [t10], t12: [t11], t13: [t12]}
     wf3 = Workflow(deps3, name='3rd workflow')
+
+    repeated_task = to_repeat(Task('repeated', printer, (5, ), {}), 10)
+    schdlr.add_repeated(repeated_task)
 
     schdlr.add_workflow(wf3)
     time.sleep(60)

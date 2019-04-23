@@ -1,0 +1,12 @@
+<table border='1'>
+    <tr>
+        <th>Item</th>
+        <th>Every</th>
+        <th>Next</th>
+    </tr>
+    {% for item in repeatables %}
+        <td>{{item.proto.name}}</td>
+        <td>{{item.every}}</td>
+        <td>{{item.next_ts.strftime("%b %d %Y %H:%M:%S")}}</td>
+    {% endfor %}
+</table>

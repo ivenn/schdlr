@@ -55,7 +55,7 @@ def workflows():
 
 @app.route('/cron')
 def cron():
-    return render_template('cron.html')
+    return render_template('cron.html', details=cron_info())
 
 
 @app.route('/scheduler_stat')
@@ -106,6 +106,13 @@ def workflow_stat():
         ))
 
     return "<br>".join(wfs)
+
+
+@app.route('/cron_info')
+def cron_info():
+    schdlr = app.config.get('schdlr')
+
+    return render_template('cron_details.html', repeatables=schdlr.to_repeat)
 
 
 def run_monitor(schdlr, port=None):
