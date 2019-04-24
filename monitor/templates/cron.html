@@ -3,5 +3,8 @@
 {% set active_page = 'cron' %}
 
 {% block content %}
-	<div id="cron">CRON TBD</div>
+	<br>
+	<div id="cron">
+		{{cron_info|safe}}
+	</div>
 {% endblock %}

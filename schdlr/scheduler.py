@@ -9,7 +9,9 @@ from schdlr import etc
 from schdlr import worker
 from schdlr import workflow
 from monitor import monitor
-
+from schdlr.repeated import Repeated
+from schdlr.task import Task
+from schdlr.workflow import Workflow
 
 logger = etc.get_logger(__name__)
 
@@ -33,7 +35,7 @@ STATE_STOPPED = "STOPPED"
 
 class Scheduler:
 
-    def __init__(self, workers_num, monitor=False, max_blocked_workers_ratio=1):
+    def __init__(self, workers_num, monitoring=False, max_blocked_workers_ratio=1):
         self.workers_num = workers_num
         self.workers = []
         self.max_blocked_workers_ratio = max_blocked_workers_ratio
@@ -44,8 +46,10 @@ class Scheduler:
         self._waiting_worker = None
 
         self.main_t = None
-        self.monitor = monitor
-        self.monitor_t = None  # TODO: should provide web interface
+        self.monitoring = monitoring
+        self.monitor_t = None
+
+        self.to_repeat = []
 
         self.workflows = {}
         self.workflows_done = {}
@@ -90,6 +94,14 @@ class Scheduler:
     def add_workflow(self, wf):
         with self._wf_lock:
             self.workflows[wf.name] = wf
+
+    def add_repeated(self, item):
+        if not isinstance(item, Repeated):
+            logger.warn("Should be a subclass of Repeated: {item}".format(
+                item=item
+            ))
+            return
+        self.to_repeat.append(item)
 
     @property
     def state(self):
@@ -158,7 +170,7 @@ class Scheduler:
 
     def _monitor(self):
         while True and not self._terminated:
-            if self.monitor:
+            if self.monitoring:
                 logger.info(self.tasks_stat(short=True))
             if (len(self.overdue_tasks) / self.workers_num) >= self.max_blocked_workers_ratio:
                 os.kill(os.getpid(), signal.SIGUSR1)
@@ -166,6 +178,21 @@ class Scheduler:
 
     def _loop(self):
         while not self._terminated:
+
+            for repeated in self.to_repeat:
+                item = repeated.next()
+                if not item:
+                    continue
+                if isinstance(item, Task):
+                    self.add_task(item)
+                elif isinstance(item, Workflow):
+                    self.add_workflow(item)
+                else:
+                    logger.warn("Unexpected stuff comes from {repeated}: {item}".format(
+                        repeated=repeated, item=item
+                    ))
+                    continue
+
             workflows = {}
             for wf in self.workflows.values():
                 tasks = wf.to_do()
