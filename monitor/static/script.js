@@ -8,7 +8,7 @@ function refreshWorkflowStat()
     $('#workflow_stat').load('workflow_stat');
 }
 
-function refreshWorkflowStat()
+function refreshCron()
 {
     $('#cron').load('cron_info');
 }

@@ -1,17 +1,23 @@
-from schdlr import task
+from schdlr import task as task_lib
 from schdlr import etc
 
 
-def foo(a, b=1, c=0):
-    return a + b + c
+class SumTask(task_lib.Task):
 
+    def __init__(self, a=1, b=1, c=0, to_raise=None, timeout=None):
+        super(SumTask, self).__init__("SumTask", timeout=timeout)
+        self.a = a
+        self.b = b
+        self.c = c
+        self.to_raise = to_raise
 
-def no_return():
-    pass
-
-
-def foo_raise(to_raise):
-    raise to_raise
+    def executable(self):
+        if self.to_raise:
+            raise self.to_raise
+        else:
+            all_sum = self.a + self.b + self.c
+            if all_sum != 0:
+                return all_sum
 
 
 def check_task_state(t, exp_state, epx_done, exp_failed, exp_log_keys):
@@ -22,36 +28,30 @@ def check_task_state(t, exp_state, epx_done, exp_failed, exp_log_keys):
 
 
 def test_init_state():
-    t = task.Task('foo_task', foo, (1,), {'b': 2, 'c': 3})
-    check_task_state(t, task.PENDING, False, False, [task.PENDING])
-    assert t.result is etc._undef_
+    task = SumTask(a=1, b=2, c=3)
+    check_task_state(task, task_lib.PENDING, False, False, [task_lib.PENDING])
+    assert task.result is etc._undef_
 
 
 def test_simple_task_pass():
-    t = task.Task('foo_task', foo, (1,), {'b': 2, 'c': 3})
-    t.execute()
-    check_task_state(t, task.DONE, True, False, [task.PENDING, task.IN_PROGRESS, task.DONE])
-    assert t.result == 6
+    task = SumTask(a=1, b=2, c=3)
+    task.execute()
+    check_task_state(task, task_lib.DONE, True, False, [task_lib.PENDING, task_lib.IN_PROGRESS, task_lib.DONE])
+    assert task.result == 6
 
 
 def test_simple_task_pass_no_return():
-    t = task.Task('no_return', no_return, (), {})
-    t.execute()
-    check_task_state(t, task.DONE, True, False, [task.PENDING, task.IN_PROGRESS, task.DONE])
-    assert t.result is None
+    task = SumTask(a=0, b=0, c=0)
+    task.execute()
+    check_task_state(task, task_lib.DONE, True, False, [task_lib.PENDING, task_lib.IN_PROGRESS, task_lib.DONE])
+    assert task.result is None
 
 
 def test_simple_task_fail():
-    e = Exception('test')
-    t = task.Task('foo_task', foo_raise, (e,), {})
-    t.execute()
-    check_task_state(t, task.FAILED, False, True, [task.PENDING, task.IN_PROGRESS, task.FAILED])
-    assert isinstance(t.traceback, str) and 'in foo_raise' in t.traceback
-    assert t.result is e
+    exc_to_raise = Exception('test')
+    task = SumTask(to_raise=exc_to_raise)
+    task.execute()
+    check_task_state(task, task_lib.FAILED, False, True, [task_lib.PENDING, task_lib.IN_PROGRESS, task_lib.FAILED])
+    assert isinstance(task.traceback, str) and 'raise self.to_raise' in task.traceback
+    assert task.result is exc_to_raise
 
-
-def test_unexpected_args():
-    t = task.Task('foo_task', foo, (1,), {'bb': 2, 'cc': 3})
-    t.execute()
-    check_task_state(t, task.FAILED, False, True, [task.PENDING, task.IN_PROGRESS, task.FAILED])
-    assert isinstance(t.result, TypeError)

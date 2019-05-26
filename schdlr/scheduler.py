@@ -120,10 +120,11 @@ class Scheduler:
         self.main_t = Thread(target=self._loop, name='schdlr')
         self.main_t.start()
 
-        self.monitor_t = Thread(target=monitor.run_monitor,
-                                args=(self, ), name='monitor')
-        self.monitor_t.daemon = True
-        self.monitor_t.start()
+        if self.monitoring:
+            self.monitor_t = Thread(target=monitor.run_monitor,
+                                    args=(self, ), name='monitor')
+            self.monitor_t.daemon = True
+            self.monitor_t.start()
 
         self.state = STATE_RUNNING
 
@@ -162,7 +163,7 @@ class Scheduler:
     @property
     def overdue_tasks(self):
         return [w.task_in_progress for w in self.workers
-                if w.task_in_progress.timed_out]
+                if w.task_in_progress and w.task_in_progress.timed_out]
 
     @property
     def stat(self):
@@ -171,7 +172,7 @@ class Scheduler:
     def _monitor(self):
         while True and not self._terminated:
             if self.monitoring:
-                logger.info(self.tasks_stat(short=True))
+                logger.info(self.tasks_stat())
             if (len(self.overdue_tasks) / self.workers_num) >= self.max_blocked_workers_ratio:
                 os.kill(os.getpid(), signal.SIGUSR1)
             time.sleep(1)

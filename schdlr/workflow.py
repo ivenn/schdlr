@@ -85,12 +85,20 @@ class Workflow:
         self.tasks_to_do = [self.start, ]
         self.tasks_in_progress = []
         self.tasks_done = []
-        self.logger = etc.get_logger("wflow.{name}".format(name=self.name))
+        self.logger = etc.get_logger("wf.{name}".format(name=self.name))
 
-    def print(self):
-        import matplotlib.pyplot as plt
-        nx.draw(self.g, None, edge_color='b', with_labels=True)
-        plt.show()
+    def copy(self):
+        old_new = {}
+        for t in self.tasks:
+            old_new[id(t)] = t.copy()
+
+        new_wf_deps = {}
+        for k, deps in self.deps.items():
+            new_k = old_new[id(k)]
+            new_k_deps = [old_new[id(dep)] for dep in deps]
+            new_wf_deps[new_k] = new_k_deps
+
+        return Workflow(new_wf_deps, self.name)
 
     @property
     def tasks(self):
