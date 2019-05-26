@@ -2,7 +2,7 @@ import time
 
 from schdlr.repeated import to_repeat
 from schdlr.scheduler import Scheduler
-from schdlr.task import Task
+from schdlr.task import FuncTask
 from schdlr.workflow import Workflow
 
 
@@ -11,12 +11,17 @@ def printer(s):
     print("hello from %s" % s)
 
 
+def another_printer(s):
+    time.sleep(s)
+    print("another hello from %s" % s)
+
+
 tasks_produced = 0
 
 
 def get_printer_tasks(num):
     global tasks_produced
-    tasks = [Task('test-%s' % i, printer, (i,), {})
+    tasks = [FuncTask(printer, (i,), {})
              for i in range(tasks_produced, tasks_produced+num)]
     tasks_produced += num
     return tasks
@@ -44,7 +49,7 @@ def main():
     deps3 = {t10: [], t11: [t10], t12: [t11], t13: [t12]}
     wf3 = Workflow(deps3, name='3rd workflow')
 
-    repeated_task = to_repeat(Task('repeated', printer, (5, ), {}), 10)
+    repeated_task = to_repeat(FuncTask(another_printer, (5, ), {}), 10)
     schdlr.add_repeated(repeated_task)
 
     schdlr.add_workflow(wf3)

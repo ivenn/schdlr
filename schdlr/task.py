@@ -19,21 +19,27 @@ DONE = "DONE"
 
 class Task:
 
-    def __init__(self, name, func, args, kwargs, timeout=None):
-        self.name = name
+    tid_counter = 0  # task_id
+
+    def __init__(self, name, timeout=None):
+        self.tid = self.assign_tid()
+        self.name = "{name}-{tid}".format(name=name, tid=self.tid)
         self.timeout = timeout
-        self.func = func
-        self.args = args
-        self.kwargs = kwargs
         self._priority = DEFAULT_PRIORITY
         self.result = etc._undef_
-        self.traceback = etc._undef_
+        self.traceback = None
         self._state = PENDING
         self._events = collections.OrderedDict({self._state: time.time()})
         self.logger = etc.get_logger("task.{name}".format(name=self.name))
 
+    @classmethod
+    def assign_tid(cls):
+        cls.tid_counter += 1
+        return cls.tid_counter
+
     def __repr__(self):
-        return "Task(name={name}, state={state})".format(
+        return "{klass}(name={name}, state={state})".format(
+            klass=self.__class__.__name__,
             name=self.name, state=self.state)
 
     def __lt__(self, other):
@@ -85,9 +91,17 @@ class Task:
     def execute(self):
         self.state = IN_PROGRESS
         try:
-            self.result = self.func(*self.args, **self.kwargs)
+            self.result = self.executable()
             self.state = DONE
         except Exception as e:
             self.result = e
             self.traceback = traceback.format_exc()
             self.state = FAILED
+
+    def executable(self):
+        raise NotImplementedError()
+
+    def copy(self):
+        raise NotImplementedError()
+
+

@@ -1,7 +1,7 @@
 import time
 
 from schdlr import worker
-from schdlr import task
+from schdlr import task_lib
 
 
 def foo(a, b=1):
@@ -31,7 +31,7 @@ def test_basic_states():
 
 def test_worker_simple_pass():
     wkr = worker.Worker('test_worker')
-    task1 = task.Task('foo_task', foo, (1,), {'b': 2})
+    task1 = task_lib.FuncTask(foo, (1,), {'b': 2})
     wkr.start()
     wkr.do(task1)
     check_worker_state(wkr, worker.PROCESSING, False)
@@ -43,7 +43,7 @@ def test_worker_simple_pass():
 
 def test_worker_simple_fail():
     wkr = worker.Worker('test_worker')
-    task1 = task.Task('foo_task', foo_raise, (), {})
+    task1 = task_lib.FuncTask(foo_raise, (), {})
     wkr.start()
     wkr.do(task1)
     check_worker_state(wkr, worker.PROCESSING, False)
@@ -55,8 +55,8 @@ def test_worker_simple_fail():
 
 def test_worker_2_tasks():
     wkr = worker.Worker('test_worker')
-    task1 = task.Task('foo_task1', foo_raise, (), {})
-    task2 = task.Task('foo_task2', foo, (1,), {'b': 2})
+    task1 = task_lib.FuncTask(foo_raise, (), {})
+    task2 = task_lib.FuncTask(foo, (1,), {'b': 2})
     wkr.start()
     wkr.do(task1)
     wkr.do(task2)

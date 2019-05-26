@@ -6,45 +6,44 @@ from schdlr.workflow import Workflow
 
 class Repeated:
 
-    def __init__(self, proto, every):
+    def __init__(self, proto, every, limit):
         self.proto = proto
+        self.limit = limit
+        self.counter = 0
         self.every = datetime.timedelta(seconds=every)
         self.next_ts = datetime.datetime.now()
-        self.repeated_num = 0
 
-    def _new_one(self, name):
+    def _new_one(self):
         raise NotImplementedError()
 
     def next(self):
         now = datetime.datetime.now()
-        if self.next_ts < now:
-            self.next_ts = now + self.every
-            self.repeated_num += 1
-            name = '{proto_name}-{number}'.format(
-                proto_name=self.proto.name, number=self.repeated_num)
-            return self._new_one(name)
-        else:
-            return None
+        if not self.limit or self.counter < self.limit:
+            if self.next_ts < now:
+                self.next_ts = now + self.every
+                self.counter += 1
+                return self._new_one()
+
+        return None
 
 
 class RepeatedTask(Repeated):
 
-    def _new_one(self, name):
-        return Task(name, self.proto.func, self.proto.args,
-                    self.proto.kwargs, self.proto.timeout)
+    def _new_one(self):
+        return self.proto.copy()
 
 
 class RepeatedWorkflow(Repeated):
 
-    def _new_one(self, name):
-         raise NotImplementedError()  # TODO: implement
+    def _new_one(self):
+        raise NotImplementedError()  # TODO: implement
 
 
-def to_repeat(item, every):
+def to_repeat(item, every, limit=None):
     if isinstance(item, Task):
-        return RepeatedTask(item, every)
+        return RepeatedTask(item, every, limit)
     elif isinstance(item, Workflow):
-        return RepeatedWorkflow(item, every)
+        return RepeatedWorkflow(item, every, limit)
     else:
         raise Exception("Unable to repeat {item}".format(item=item))
 
